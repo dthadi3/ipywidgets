@@ -8,13 +8,22 @@ python:
     - 3.7
     - 3.8
     - 3.9
+addons:
+  apt_packages:
+    - pandoc
+  firefox: latest
+services:
+  - xvfb
+cache: yarn
 env:
     - GROUP=python
 sudo: false
 before_install:
     - 'if [[ $GROUP == python || doc ]] ; then pip install --upgrade setuptools pip; fi'
+    - 'if [[ $GROUP == js ]] ; then nvm install 12 ; fi'
 install:
     - 'if [[ $GROUP == python || doc ]] ; then pip install file://$PWD#egg=ipywidgets[test] coveralls; fi'
+    - 'if [[ $GROUP == js ]] ; then echo `yarn -v` ; echo `node -v` ; yarn ; yarn run build ; yarn run build:examples ; fi'
 script:
     - 'if [[ $GROUP == python ]] ; then pytest --cov=ipywidgets ipywidgets ; fi'
     - 'if [[ $GROUP == doc ]] ; then 
@@ -22,6 +31,23 @@ script:
         pip install -r requirements.txt ;
         make html ;
         popd ; fi'
+    - 'if [[ $GROUP == js ]] ; then 
+        export CHROME_BIN=chromium-browser ;
+        yarn run integrity ;
+        cd packages ;
+        cd base ;
+        yarn run test:unit:$BROWSER ;
+        cd .. ;
+        cd controls ;
+        yarn run test:unit:$BROWSER ;
+        cd .. ;
+        cd html-manager ;
+        yarn run test:unit:$BROWSER ;
+        cd .. ;
+        cd .. ;
+        cd examples/web1 ;
+        yarn run test:firefox ;
+        cd ../.. ; fi'
 matrix:
     include:
         - python: 3.6
@@ -29,5 +55,10 @@ matrix:
         - python: 3.6
           env: GROUP=doc
           arch: ppc64le
+        - python: 3.6
+          env: GROUP=js BROWSER=firefox
+        - python: 3.6
+          arch: ppc64le
+          env: GROUP=js BROWSER=firefox
 after_success:
     - coveralls
